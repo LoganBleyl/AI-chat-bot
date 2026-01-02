@@ -4,7 +4,8 @@ from prompts import system_prompt
 from call_function import (schema_get_files_info,
 schema_get_file_content, 
 schema_run_python_file, 
-schema_write_file)
+schema_write_file,
+call_function,)
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -29,7 +30,7 @@ parser.add_argument("--verbose", action="store_true", help="Enable verbose outpu
 args = parser.parse_args()
 messages = [types.Content(role="user", parts=[types.Part(text=args.user_prompt)])]
 model_name = "gemini-2.5-flash"
-
+function_results = []
 
 
 response = client.models.generate_content(
@@ -54,11 +55,25 @@ if args.verbose:
     print(f"User prompt: {args.user_prompt}")
     print(f"Prompt tokens: {prompt_token_count}")
     print(f"Response tokens: {candidates_token_count}")
-    print(response.text)
+
 
 if response.function_calls:
     for function_call in response.function_calls:
-        print(f"Calling function: {function_call.name}({function_call.args})")
+        function_call_result = call_function(function_call, verbose=args.verbose)
+        
+        if function_call_result.parts is None:
+            raise Exception("Error: Function_call is emtpy")
+        first_part = function_call_result.parts[0]
+        function_response = first_part.function_response
+        
+        if function_response is None:
+            raise Exception("Error: Function_response is empty.")
+        if function_response.response is None:
+            raise Exception("Error: Response is empty.")
+        function_results.append(first_part)
+        
+        if args.verbose:
+            print(f"-> {function_response.response}")
 
 else:
        print(response.text)
